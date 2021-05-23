@@ -10,40 +10,40 @@ import matplotlib.animation as ani
 
 
 # Finite difference kernels (first and second order derivatives)
-d1_kernel = np.array([1.0, -8, 0, +8, -1.0])
-d2_kernel = np.array([-1.0, 16.0, -30.0, 16.0, -1.0])
+d1_kernel = np.array([1.0, -8, 0, +8, -1.0]) / 12
+d2_kernel = np.array([-1.0, 16.0, -30.0, 16.0, -1.0]) / 12
 
 # Simulation parameters:
 # - gamma parameter of the cell
-gam = 1.0
+gam = 30.0
 # - lambda parameter of the cell
-lam = 1.0
+lam = 3.0
 # - length of the domain
 length = 300
 # - size of the cell
 size = 100
 # - strength of the area constraint
-mu = 1.0
+mu = 10.0
 # - strength of the repulsion with the wall
-kappa = 20.0
+kappa = 200.0
 # - time step
-dt = 5e-5
+dt = 5e-6
 # - coupling constant between polarisation and force
-J = 1
+J = 5e4
 # - diffusion constant of the polarisation
-D = 30.0
+D = 450.0
 # - number of steps between plotting
 nsteps = 500
 # - substrate friction
-xi = 10.0
+xi = 1.0
 # - coupling between polarisation and velocity
-alpha = 10.0
+alpha = 100.0
 
 # Dofs:
 # - phase field (with boundary nodes)
 phi = np.zeros(length + 4)
 # - cell polarisation
-pol = 100.0
+pol = 0.0
 # - walls phase field (with boundary nodes)
 bdr = np.zeros(length + 4)
 
@@ -76,15 +76,15 @@ def step(relax=False):
 
     # compute the free energy terms
     dFch_dphi = 8 * gam / lam * phi * (1 - phi) * (1 - 2 * phi) - 2 * gam * lam * delta_phi
-    dFarea_dphi = -4 * mu / size * (1 - np.sum(phi[2:-2] ** 2) / size)
+    dFarea_dphi = -4 * mu / size * phi * (1 - np.sum(phi[2:-2] ** 2) / size)
     dFrep_dphi = +2 * kappa / lam * phi * bdr ** 2
 
     # compute force
-    F = np.mean(((dFch_dphi - dFarea_dphi - dFrep_dphi) * delta_phi)[2:-2])
+    F = np.mean(((dFch_dphi - dFarea_dphi - dFrep_dphi) * nabla_phi)[2:-2])
 
     # update polarisation to align with force
     if not relax:
-        pol += J * np.abs(F) * (F - pol) + np.sqrt(dt) * D * np.random.randn()
+        pol += J * np.abs(F) * (F - pol) * dt + np.random.randn() * np.sqrt(2 * D * dt)
 
     # free enery terms
     phi -= (dFch_dphi + dFarea_dphi + dFrep_dphi) * dt
@@ -132,11 +132,8 @@ def plot(time):
 
 # relax cell for some time while setting a high friction to remove forces.
 initial_cond()
-old_xi = xi
-xi = 1e100
 for _ in range(10 * nsteps):
     step(relax=True)
-xi = old_xi  # restore substrate friction coefficient
 
 # initialise figure and start animation
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
